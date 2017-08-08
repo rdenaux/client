@@ -33,6 +33,10 @@ function mathPlaceholder(id) {
   return '{math:' + id.toString() + '}';
 }
 
+function embedPlaceholder(id) {
+  return '{embed:' + id.toString() + '}';
+}
+
 /**
  * Parses a string containing mixed markdown and LaTeX in between
  * '$$..$$' or '\( ... \)' delimiters and returns an object containing a
@@ -98,6 +102,79 @@ function extractMath(content) {
   };
 }
 
+/**
+ * @typedef {Object} EmbedLink
+ * @prop {string} id
+ * @prop {string} url - Original "src" of the embedded content
+ */
+
+/**
+ * Extract references to embedded `<iframe>` content and replace with
+ * placeholders.
+ *
+ * The placeholders are later replaced with sandboxed iframes, ignoring
+ * attributes set on the original iframe. This enables users to copy and paste
+ * "embed codes" which include iframes from sites like h5p.org, without
+ * incurring the security risks of allowing arbitrary HTML.
+ *
+ * @param {string} content
+ * @return {EmbedLink[]} - List of mappings from placeholder id to "src" value
+ */
+function extractEmbeds(content) {
+  var embedLinks = [];
+  var pos = 0;
+  var replacedContent = content;
+
+  while (true) { // eslint-disable-line no-constant-condition
+
+    // Using string matching to find iframe tags is imperfect but fast and good
+    // enough for our purposes.
+    var startTag = '<iframe';
+    var endTag = '</iframe>';
+
+    var embedStart = replacedContent.indexOf(startTag, pos);
+    if (embedStart === -1) {
+      break;
+    }
+    var embedEnd = replacedContent.indexOf(endTag, embedStart + startTag.length);
+
+    if (embedEnd === -1) {
+      break;
+    } else {
+      embedEnd = embedEnd + endTag.length;
+    }
+
+    // Again, using a regex to find and extract the "src" attribute here is
+    // not very tolerant but good enough for our needs.
+    var srcMatch = replacedContent
+      .slice(embedStart, embedEnd)
+      .match(/src="([^"]+)"/);
+    if (!srcMatch) {
+      break;
+    }
+
+    var url = srcMatch[1];
+    var id = embedLinks.length + 1;
+    var placeholder = embedPlaceholder(id);
+    embedLinks.push({ id, url });
+
+    var replacement;
+    // Add new lines before and after embeds so that they render
+    // as separate paragraphs
+    replacement = '\n\n' + placeholder + '\n\n';
+
+    replacedContent = replacedContent.slice(0, embedStart) +
+                      replacement +
+                      replacedContent.slice(embedEnd);
+    pos = embedStart + replacement.length;
+  }
+
+  return {
+    embedLinks,
+    content: replacedContent,
+  };
+}
+
 function insertMath(html, mathBlocks) {
   return mathBlocks.reduce(function (html, block) {
     var renderedMath;
@@ -116,15 +193,37 @@ function insertMath(html, mathBlocks) {
   }, html);
 }
 
-function renderMathAndMarkdown(markdown, sanitizeFn) {
+/**
+ * Replace embed placeholders with tagged links.
+ *
+ * The tagged links are later converted to sandboxed iframes by the media
+ * embedder.
+ */
+function insertEmbedLinks(html, embeds) {
+  return embeds.reduce((html, embed) => {
+    // The "js-embed" class tags the link for later replacement with an iframe
+    // by `media-embedder`.
+    var embedLink = `<a class="js-embed" href="${encodeURI(embed.url)}">${escapeHtml(embed.url)}</a>`;
+    return html.replace(embedPlaceholder(embed.id), embedLink);
+  }, html);
+}
+
+function render(markdown, sanitizeFn) {
   // KaTeX takes care of escaping its input, so we want to avoid passing its
   // output through the HTML sanitizer. Therefore we first extract the math
   // blocks from the input, render and sanitize the remaining markdown and then
   // render and re-insert the math blocks back into the output.
   var mathInfo = extractMath(markdown);
-  var markdownHTML = sanitizeFn(renderMarkdown(mathInfo.content));
-  var mathAndMarkdownHTML = insertMath(markdownHTML, mathInfo.mathBlocks);
-  return mathAndMarkdownHTML;
+
+  // Extract details of embedded iframes and replace with placeholders, since
+  // iframes will be removed when sanitizing the HTML.
+  var embedInfo = extractEmbeds(mathInfo.content);
+
+  var html = sanitizeFn(renderMarkdown(embedInfo.content));
+  html = insertEmbedLinks(html, embedInfo.embedLinks);
+  html = insertMath(html, mathInfo.mathBlocks);
+
+  return html;
 }
 
-module.exports = renderMathAndMarkdown;
+module.exports = render;

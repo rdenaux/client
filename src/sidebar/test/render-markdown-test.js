@@ -2,7 +2,7 @@
 
 var proxyquire = require('proxyquire');
 
-describe('render-markdown', function () {
+describe('sidebar.render-markdown', function () {
   var render;
   var renderMarkdown;
 
@@ -94,6 +94,40 @@ describe('render-markdown', function () {
     it('should render mixed inline LaTeX blocks', function () {
       assert.equal(render('one \\(x+2\\) two \\(x+3\\) four'),
         '<p>one math:x+2 two math:x+3 four</p>');
+    });
+  });
+
+  describe('iframe tags ("embed codes")', () => {
+    [{
+      url: 'https://h5p.org/h5p/embed/707',
+      linkHref: 'https://h5p.org/h5p/embed/707',
+      linkText: 'https://h5p.org/h5p/embed/707',
+    },{
+      url: 'https://evil.org/<script',
+      linkHref: 'https://evil.org/%3Cscript',
+      linkText: 'https://evil.org/&lt;script',
+    }].forEach(({ url, linkHref, linkText }) => {
+      it('should convert `<iframe>` tags to links', () => {
+        var content = `
+          <iframe src="${url}"
+                  width="1090"
+                  height="232"
+                  frameborder="0"
+                  allowfullscreen="allowfullscreen"></iframe>`;
+
+        var rendered = render(content);
+
+        assert.equal(rendered, `<p><a class="js-embed" href="${linkHref}">${linkText}</a></p>`);
+      });
+    });
+
+    it('should not pass `<iframe>` tags to sanitizer', () => {
+      var sanitize = sinon.spy(html => html);
+      var content = '<iframe src="https://charts.com/1234"></iframe>';
+
+      render(content, sanitize);
+
+      assert.calledWith(sanitize, '<p>{embed:1}</p>');
     });
   });
 });

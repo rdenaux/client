@@ -3,6 +3,7 @@
 'use strict';
 
 var path = require('path');
+var url = require('url');
 
 var batch = require('gulp-batch');
 var changed = require('gulp-changed');
@@ -12,6 +13,7 @@ var endOfStream = require('end-of-stream');
 var gulp = require('gulp');
 var gulpIf = require('gulp-if');
 var gulpUtil = require('gulp-util');
+var mustache = require('gulp-mustache');
 var postcss = require('gulp-postcss');
 var postcssURL = require('postcss-url');
 var replace = require('gulp-replace');
@@ -202,6 +204,30 @@ gulp.task('watch-images', ['build-images'], function () {
   gulp.watch(imageFiles, ['build-images']);
 });
 
+gulp.task('build-html', () => {
+  var clientIdRequiredMsg = 'You must configure an OAuth client ID with the "OAUTH_CLIENT_ID" env var';
+  var serviceUrl = process.env.H_SERVICE_URL || 'https://hypothes.is';
+  var config = {
+    apiUrl: `${serviceUrl}/api/`,
+    authDomain: url.parse(serviceUrl).hostname,
+
+    oauthClientId: process.env.OAUTH_CLIENT_ID || clientIdRequiredMsg,
+    oauthEnabled: true,
+
+    // FIXME - Once the cookie auth code has been removed, this should no longer
+    // be required. It should be unused when using OAuth.
+    serviceUrl,
+  };
+  var htmlSafeJsonConfig = JSON.stringify(config)
+                               .replace(/</g, '\\u003c');
+  gulp.src('src/sidebar/app.html.mustache')
+    .pipe(mustache({
+      htmlSafeJsonConfig,
+    }))
+    .pipe(rename('app.html'))
+    .pipe(gulp.dest('./build'));
+});
+
 gulp.task('watch-templates', function () {
   gulp.watch(TEMPLATES_DIR + '/*.html', function (file) {
     liveReloadServer.notifyChanged([file.path]);
@@ -337,6 +363,7 @@ gulp.task('serve-package', function () {
 gulp.task('build', ['build-js',
                     'build-css',
                     'build-fonts',
+                    'build-html',
                     'build-images'],
           generateManifest);
 

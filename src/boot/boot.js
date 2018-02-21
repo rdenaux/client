@@ -21,7 +21,7 @@ function injectScript(doc, src) {
 
 function injectAssets(doc, config, assets) {
   assets.forEach(function (path) {
-    var url = config.assetRoot + 'build/' + config.manifest[path];
+    var url = config.assetRoot + config.manifest[path];
     if (url.match(/\.css/)) {
       injectStylesheet(doc, url);
     } else {
@@ -55,7 +55,7 @@ function bootHypothesisClient(doc, config) {
   // annotation interactions.
   var clientUrl = doc.createElement('link');
   clientUrl.rel = 'hypothesis-client';
-  clientUrl.href = config.assetRoot + 'build/boot.js';
+  clientUrl.href = config.assetRoot + 'boot.js';
   clientUrl.type = 'application/annotator+javascript';
   doc.head.appendChild(clientUrl);
 

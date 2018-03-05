@@ -223,3 +223,21 @@ describe 'Document', ->
       doc = createDoc('https://publisher.org/not-canonical', null)
 
       assert.equal doc.uri(), canonicalLink.href
+
+  describe '#refreshMetadata', ->
+
+    it 'clears cached metadata', ->
+      # This relies on the "citation_title" meta tag created by the metadata
+      # tests above.
+      titleEl = $('meta[name="citation_title"]')[0]
+      titleEl.content = 'First title'
+      doc = new Document($('<div></div>')[0], {})
+      doc.pluginInit()
+
+      assert.equal doc.metadata.title, 'First title'
+
+      titleEl.content = 'Second title'
+      assert.equal doc.metadata.title, 'First title'
+
+      doc.refreshMetadata()
+      assert.equal doc.metadata.title, 'Second title'

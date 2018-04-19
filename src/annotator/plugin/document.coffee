@@ -123,7 +123,12 @@ module.exports = class Document extends Plugin
     # look for some relevant link relations
     for link in $("link")
       l = $(link)
-      href = this._absoluteUrl(l.prop('href')) # get absolute url
+      href = l.prop('href')
+      try
+        href = this._absoluteUrl(href)
+      catch
+        # Could not determine absolute URL. Skip this link.
+        continue
       rel = l.prop('rel')
       type = l.prop('type')
       lang = l.prop('hreflang')
@@ -143,9 +148,13 @@ module.exports = class Document extends Plugin
 
       if name == "pdf_url"
         for url in values
-          @metadata.link.push
-            href: this._absoluteUrl(url)
-            type: "application/pdf"
+          try
+            @metadata.link.push
+              href: this._absoluteUrl(url)
+              type: "application/pdf"
+          catch
+            # Could not determine absolute URL. Skip this link
+            continue
 
       # kind of a hack to express DOI identifiers as links but it's a
       # convenient place to look them up later, and somewhat sane since
@@ -182,7 +191,11 @@ module.exports = class Document extends Plugin
   _getFavicon: =>
     for link in $("link")
       if $(link).prop("rel") in ["shortcut icon", "icon"]
-        @metadata["favicon"] = this._absoluteUrl(link.href)
+        try
+          @metadata["favicon"] = this._absoluteUrl(link.href)
+        catch
+          # Could not determine absolute URL. Skip this link.
+          continue
 
   # Hack to get a absolute url from a possibly relative one
   _absoluteUrl: (url) ->

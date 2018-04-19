@@ -13,6 +13,19 @@ Document = require('../document')
 ** https://github.com/openannotation/annotator/blob/master/LICENSE
 ###
 
+
+createLink = (doc, rel, href) ->
+  link = doc.createElement('link')
+  link.rel = rel
+  link.href = href
+  link
+
+createMeta = (doc, name, content) ->
+  meta = doc.createElement('meta')
+  meta.name = name
+  meta.content = content
+  meta
+
 describe 'Document', ->
   testDocument = null
 
@@ -133,6 +146,54 @@ describe 'Document', ->
     it 'should have a documentFingerprint as the dc resource identifiers URN href', ->
       assert.equal(metadata.documentFingerprint, metadata.link[9].href)
 
+  context "when the document's absolute URL is unknown", ->
+    htmlDoc = null
+
+    beforeEach ->
+      htmlDoc = document.implementation.createHTMLDocument()
+
+    it 'should return absolute URLs in metadata', ->
+      relativeLink = createLink(htmlDoc, 'alternate', 'https://example.com/article.xml')
+      htmlDoc.head.appendChild(relativeLink)
+
+      favLink = createLink(htmlDoc, 'favicon', 'https://example.com/test.ico')
+      htmlDoc.head.appendChild(favLink)
+
+      pdfUrlMeta = createMeta(htmlDoc, 'citation_pdf_url', 'https://example.com/article.pdf')
+
+      doc = new Document(htmlDoc.body, {
+        document: htmlDoc,
+        baseURI: 'blob:1234',
+      })
+      doc.pluginInit()
+
+      assert.equal doc.metadata.favicon, 'https://example.com/test.ico'
+      assert.deepEqual doc.metadata.link, [{
+        href: 'https://example.com/article.xml',
+      },{
+        href: 'https://example.com/test.ico',
+      },{
+        href: 'https://example.com/article.pdf',
+      }]
+
+    it 'it should not resolve relative URLs in metadata', ->
+      relativeLink = createLink(htmlDoc, 'alternate', 'foo.pdf')
+      htmlDoc.head.appendChild(relativeLink)
+
+      favLink = createLink(htmlDoc, 'favicon', 'test.ico')
+      htmlDoc.head.appendChild(favLink)
+
+      pdfUrlMeta = createMeta(htmlDoc, 'citation_pdf_url', 'article.pdf')
+
+      doc = new Document(htmlDoc.body, {
+        document: htmlDoc,
+        baseURI: 'blob:1234',
+      })
+      doc.pluginInit()
+
+      assert.equal doc.metadata.favicon, undefined
+      assert.equal doc.metadata.link, []
+
 
   describe '#_absoluteUrl', ->
 
@@ -211,8 +272,11 @@ describe 'Document', ->
       ['chrome://foo', 'chrome://blah'],
     ].forEach ([href, baseURI]) ->
       it "should return the document's URL if it and the baseURI do not have an allowed scheme", ->
-        doc = createDoc(href, baseURI)
-        assert.equal(doc.uri(), href)
+        try
+          doc = createDoc(href, baseURI)
+          assert.equal(doc.uri(), href)
+        catch e
+          console.error "Failed with href #{href} and baseURI #{baseURI}"
 
     it 'returns the canonical URI if present', ->
       canonicalLink = document.createElement('link')

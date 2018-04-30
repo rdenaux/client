@@ -1,4 +1,3 @@
-$ = require('jquery')
 baseURI = require('document-base-uri')
 
 Plugin = require('../plugin')
@@ -87,9 +86,9 @@ module.exports = class Document extends Plugin
 
   _getMetaTags: (prefix, attribute, delimiter) =>
     tags = {}
-    for meta in $("meta")
-      name = $(meta).attr(attribute)
-      content = $(meta).prop("content")
+    for meta in @document.querySelectorAll('meta')
+      name = meta.getAttribute(attribute)
+      content = meta.content
       if name
         match = name.match(RegExp("^#{prefix}#{delimiter}(.+)$", "i"))
         if match
@@ -114,24 +113,28 @@ module.exports = class Document extends Plugin
     else if @metadata.dc.title
       @metadata.title = @metadata.dc.title[0]
     else
-      @metadata.title = $("head title").text()
+      titleEl = @document.querySelector('head title')
+      if titleEl
+        @metadata.title = titleEl.textContent
+      else
+        @metadata.title = null
 
   _getLinks: =>
 # we know our current location is a link for the document
     @metadata.link = [href: this._getDocumentHref()]
 
-    # look for some relevant link relations
-    for link in $("link")
-      l = $(link)
-      href = l.prop('href')
+    # Look for relevant link relations
+    for link in @document.querySelectorAll('link')
+      l = link
+      href = l.getAttribute('href')
       try
         href = this._absoluteUrl(href)
       catch
         # Could not determine absolute URL. Skip this link.
         continue
-      rel = l.prop('rel')
-      type = l.prop('type')
-      lang = l.prop('hreflang')
+      rel = l.rel
+      type = l.type
+      lang = l.hreflang
 
       if rel not in ["alternate", "canonical", "bookmark", "shortlink"] then continue
 
@@ -189,10 +192,10 @@ module.exports = class Document extends Plugin
       @metadata.documentFingerprint = dcUrn
 
   _getFavicon: =>
-    for link in $("link")
-      if $(link).prop("rel") in ["shortcut icon", "icon"]
+    for link in @document.querySelectorAll('link')
+      if link.rel in ["shortcut icon", "icon"]
         try
-          @metadata["favicon"] = this._absoluteUrl(link.href)
+          @metadata["favicon"] = this._absoluteUrl(link.getAttribute('href'))
         catch
           # Could not determine absolute URL. Skip this link.
           continue

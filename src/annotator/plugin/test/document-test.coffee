@@ -156,10 +156,11 @@ describe 'Document', ->
       relativeLink = createLink(htmlDoc, 'alternate', 'https://example.com/article.xml')
       htmlDoc.head.appendChild(relativeLink)
 
-      favLink = createLink(htmlDoc, 'favicon', 'https://example.com/test.ico')
+      favLink = createLink(htmlDoc, 'icon', 'https://example.com/test.ico')
       htmlDoc.head.appendChild(favLink)
 
       pdfUrlMeta = createMeta(htmlDoc, 'citation_pdf_url', 'https://example.com/article.pdf')
+      htmlDoc.head.appendChild(pdfUrlMeta)
 
       doc = new Document(htmlDoc.body, {
         document: htmlDoc,
@@ -170,10 +171,11 @@ describe 'Document', ->
       assert.equal doc.metadata.favicon, 'https://example.com/test.ico'
       assert.deepEqual doc.metadata.link, [{
         href: 'https://example.com/article.xml',
-      },{
-        href: 'https://example.com/test.ico',
+        rel: 'alternate',
+        type: '',
       },{
         href: 'https://example.com/article.pdf',
+        type: 'application/pdf',
       }]
 
     it 'it should not resolve relative URLs in metadata', ->
@@ -184,6 +186,7 @@ describe 'Document', ->
       htmlDoc.head.appendChild(favLink)
 
       pdfUrlMeta = createMeta(htmlDoc, 'citation_pdf_url', 'article.pdf')
+      htmlDoc.head.appendChild(pdfUrlMeta)
 
       doc = new Document(htmlDoc.body, {
         document: htmlDoc,
@@ -235,10 +238,15 @@ describe 'Document', ->
         canonicalLink.remove()
 
     createDoc = (href, baseURI) ->
+      # `document.location` cannot be overridden directly, so create a wrapper
+      # around the document which implements `location` itself and proxies
+      # to `document` for other methods.
       fakeDocument =
-        createElement: document.createElement.bind(document),
         location:
           href: href
+        createElement: document.createElement.bind(document),
+        querySelector: document.querySelector.bind(document),
+        querySelectorAll: document.querySelectorAll.bind(document),
       doc = new Document($('<div></div>')[0], {
         document: fakeDocument,
         baseURI: baseURI,

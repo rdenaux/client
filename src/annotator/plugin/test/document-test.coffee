@@ -195,7 +195,7 @@ describe 'Document', ->
       doc.pluginInit()
 
       assert.equal doc.metadata.favicon, undefined
-      assert.equal doc.metadata.link, []
+      assert.deepEqual doc.metadata.link, []
 
 
   describe '#_absoluteUrl', ->

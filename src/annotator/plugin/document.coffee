@@ -120,8 +120,12 @@ module.exports = class Document extends Plugin
         @metadata.title = null
 
   _getLinks: =>
-# we know our current location is a link for the document
-    @metadata.link = [href: this._getDocumentHref()]
+    @metadata.link = []
+
+    # Use the document's location as a link, if it has one.
+    documentHref = this._getDocumentHref()
+    if documentHref
+      @metadata.link.push(href: documentHref)
 
     # Look for relevant link relations
     for link in @document.querySelectorAll('link')
@@ -204,16 +208,24 @@ module.exports = class Document extends Plugin
   _absoluteUrl: (url) ->
     normalizeURI(url, @baseURI)
 
-  # Get the true URI record when it's masked via a different protocol.
-  # This happens when an href is set with a uri using the 'blob:' protocol
-  # but the document can set a different uri through a <base> tag.
+  # Get the document's HTTP or file URL.
+  #
+  # This may be different from the location returned by `document.location.href`
+  # if the document has been loaded from eg. a Blob URL but defines an HTTP
+  # URL via a `<base>` tag.
+  #
+  # If the document was constructed programatically, it may not have a URL,
+  # in which case this function returns `null`.
   _getDocumentHref: ->
-    href = @document.location.href
+    href = null
     allowedSchemes = ['http:', 'https:', 'file:']
 
-    # Use the current document location if it has a recognized scheme.
-    if new URL(href).protocol in allowedSchemes
-      return href
+    if @document.location
+      href = @document.location.href
+
+      # Use the current document location if it has a recognized scheme.
+      if new URL(href).protocol in allowedSchemes
+        return href
 
     # Otherwise, try using the location specified by the <base> element.
     if @baseURI and (new URL(@baseURI).protocol in allowedSchemes)
